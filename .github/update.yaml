@@ -1,0 +1,44 @@
+name: Daily Repository Update
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Every day at midnight
+  workflow_dispatch:
+
+jobs:
+  update-repo:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      with:
+        token: ${{ secrets.ACCESSTOKEN }}
+
+    - name: Remove and Update evilginx2
+      run: |
+        if [ -d evilginx2 ]; then rm -Rf evilginx2; fi
+        git clone https://github.com/kgretzky/evilginx2
+        if [ -d "evilginx2/.git" ]; then rm -Rf "evilginx2/.git"; fi
+        if [ -d "evilginx2/.github" ]; then rm -Rf "evilginx2/.github"; fi
+
+    - name: Remove specific the evilGinx Header
+      run: |
+        sed -i 's/req.Header.Set(p.getHomeDir(), o_host)/\/\/req.Header.Set(p.getHomeDir(), o_host)/' evilginx2/core/http_proxy.go
+        sed -i 's/o_host := req.Host/\/\/o_host := req.Host/' evilginx2/core/http_proxy.go
+        # sed -i 's/SetHttpsPort(443)/SetHttpsPort(8443)/' evilginx2/core/config.go
+        # UComment the above line if you are using an Apache instance to protect the EvilGinx instance (like the EvilGoPhish setup does)
+        
+
+    - name: Update http_proxy.go for X-Forwarded-For support
+      run: |
+        sed -i '/remote_addr := parts\[0\]/a \ \ \ \ xForwardedFor := req.Header.Get("X-Forwarded-For")\n \ \ \ \ if xForwardedFor != "" {\n \ \ \ \ \ \ \ \ remote_addr = strings.TrimSpace(strings.Split(xForwardedFor, ",")[0])\n \ \ \ \ } else {\n \ \ \ \ \ \ \ \ remote_addr = parts[0]\n \ \ \ \ }' evilginx2/core/http_proxy.go
+   
+    - name: Push changes
+      run: |
+        git config --global user.name '<USERNAME>'
+        git config --global user.email '<EMAIL>'
+        git add .
+        git add evilginx2
+        git commit -m "Updated EvilGinx"
+        git push
